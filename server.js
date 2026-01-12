@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -30,68 +29,25 @@ if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/bsu-chat';
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
-  console.log('MongoDB connected');
-}).catch(err => {
-  console.error('MongoDB connection error:', err);
-});
+// In-Memory Database
+const db = {
+  users: [],
+  messages: [],
+  reports: [],
+  admins: [],
+  settings: {
+    rules: 'Qaydalar buraya yazılacaq.',
+    dailyTopic: '',
+    filterWords: [],
+    groupMessageExpiry: 24,
+    privateMessageExpiry: 48
+  }
+};
 
-// Models
-const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  phone: { type: String, required: true },
-  fullName: { type: String, required: true },
-  faculty: { type: String, required: true },
-  degree: { type: String, required: true },
-  course: { type: Number, required: true, min: 1, max: 6 },
-  password: { type: String, required: true },
-  profilePicture: { type: String, default: '' },
-  isActive: { type: Boolean, default: true },
-  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  createdAt: { type: Date, default: Date.now }
-});
-
-const messageSchema = new mongoose.Schema({
-  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  facultyId: { type: String },
-  content: { type: String, required: true },
-  type: { type: String, enum: ['group', 'private'], required: true },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const reportSchema = new mongoose.Schema({
-  reportedUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  reporterId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  reason: { type: String },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const adminSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  isSuperAdmin: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const settingsSchema = new mongoose.Schema({
-  rules: { type: String, default: 'Qaydalar buraya yazılacaq.' },
-  dailyTopic: { type: String, default: '' },
-  filterWords: [{ type: String }],
-  groupMessageExpiry: { type: Number, default: 24 }, // hours
-  privateMessageExpiry: { type: Number, default: 48 } // hours
-});
-
-const User = mongoose.model('User', userSchema);
-const Message = mongoose.model('Message', messageSchema);
-const Report = mongoose.model('Report', reportSchema);
-const Admin = mongoose.model('Admin', adminSchema);
-const Settings = mongoose.model('Settings', settingsSchema);
+// Helper functions for ID generation
+function generateId() {
+  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
 
 // File upload configuration
 const storage = multer.diskStorage({
@@ -106,7 +62,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -142,36 +98,18 @@ const verificationQuestions = [
   { question: "Sosial elmlər və psixologiya fakültəsi hansı korpusda yerləşir?", answer: "2" }
 ];
 
-// Faculties list
-const faculties = [
-  "Mexanika-riyaziyyat fakültəsi",
-  "Tətbiqi riyaziyyat və kibernetika fakültəsi",
-  "Fizika fakültəsi",
-  "Kimya fakültəsi",
-  "Biologiya fakültəsi",
-  "Ekologiya və torpaqşünaslıq fakültəsi",
-  "Coğrafiya fakültəsi",
-  "Geologiya fakültəsi",
-  "Filologiya fakültəsi",
-  "Tarix fakültəsi",
-  "Beynəlxalq münasibətlər və iqtisadiyyat fakültəsi",
-  "Hüquq fakültəsi",
-  "Jurnalistika fakültəsi",
-  "İnformasiya və sənəd menecmenti fakültəsi",
-  "Şərqşünaslıq fakültəsi",
-  "Sosial elmlər və psixologiya fakültəsi"
-];
-
 // Initialize super admin
 async function initializeSuperAdmin() {
   try {
-    const existingAdmin = await Admin.findOne({ username: '618ursamajor618' });
+    const existingAdmin = db.admins.find(a => a.username === '618ursamajor618');
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash('618ursa618', 10);
-      await Admin.create({
+      db.admins.push({
+        _id: generateId(),
         username: '618ursamajor618',
         password: hashedPassword,
-        isSuperAdmin: true
+        isSuperAdmin: true,
+        createdAt: new Date()
       });
       console.log('Super admin created');
     }
@@ -180,37 +118,22 @@ async function initializeSuperAdmin() {
   }
 }
 
-// Initialize settings
-async function initializeSettings() {
-  try {
-    const existingSettings = await Settings.findOne();
-    if (!existingSettings) {
-      await Settings.create({});
-      console.log('Settings initialized');
-    }
-  } catch (error) {
-    console.error('Error initializing settings:', error);
-  }
-}
-
 initializeSuperAdmin();
-initializeSettings();
 
 // Helper function to get Baku time
 function getBakuTime() {
   const date = new Date();
   const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const bakuTime = new Date(utc + (3600000 * 4)); // UTC+4 for Baku
+  const bakuTime = new Date(utc + (3600000 * 4));
   return bakuTime;
 }
 
 // Helper function to filter profanity
-async function filterProfanity(text) {
-  const settings = await Settings.findOne();
-  if (!settings || !settings.filterWords.length) return text;
+function filterProfanity(text) {
+  if (!db.settings.filterWords.length) return text;
   
   let filteredText = text;
-  settings.filterWords.forEach(word => {
+  db.settings.filterWords.forEach(word => {
     const regex = new RegExp(word, 'gi');
     filteredText = filteredText.replace(regex, '*'.repeat(word.length));
   });
@@ -249,13 +172,11 @@ app.post('/api/register', async (req, res) => {
   try {
     const { email, phone, fullName, faculty, degree, course, password } = req.body;
     
-    // Validate email domain
     if (!email.endsWith('@bsu.edu.az')) {
       return res.status(400).json({ message: 'Yalnız @bsu.edu.az domeni ilə qeydiyyat mümkündür' });
     }
     
-    // Check if user already exists
-    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
+    const existingUser = db.users.find(u => u.email === email || u.phone === phone);
     if (existingUser) {
       if (!existingUser.isActive) {
         return res.status(403).json({ message: 'Bu hesab deaktiv edilib' });
@@ -263,21 +184,25 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ message: 'Bu email və ya telefon nömrəsi artıq istifadə olunub' });
     }
     
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Create user
-    const user = await User.create({
+    const user = {
+      _id: generateId(),
       email,
       phone,
       fullName,
       faculty,
       degree,
       course,
-      password: hashedPassword
-    });
+      password: hashedPassword,
+      profilePicture: '',
+      isActive: true,
+      blockedUsers: [],
+      createdAt: new Date()
+    };
     
-    // Generate token
+    db.users.push(user);
+    
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
     
     res.status(201).json({
@@ -304,7 +229,7 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    const user = await User.findOne({ email });
+    const user = db.users.find(u => u.email === email);
     if (!user) {
       return res.status(400).json({ message: 'İstifadəçi tapılmadı' });
     }
@@ -343,7 +268,7 @@ app.post('/api/admin/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    const admin = await Admin.findOne({ username });
+    const admin = db.admins.find(a => a.username === username);
     if (!admin) {
       return res.status(400).json({ message: 'Admin tapılmadı' });
     }
@@ -379,13 +304,13 @@ const verifyToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded.userId) {
-      const user = await User.findById(decoded.userId);
+      const user = db.users.find(u => u._id === decoded.userId);
       if (!user || !user.isActive) {
         return res.status(403).json({ message: 'İstifadəçi aktiv deyil' });
       }
       req.user = user;
     } else if (decoded.adminId) {
-      const admin = await Admin.findById(decoded.adminId);
+      const admin = db.admins.find(a => a._id === decoded.adminId);
       if (!admin) {
         return res.status(403).json({ message: 'Admin tapılmadı' });
       }
@@ -404,9 +329,8 @@ app.post('/api/upload-profile-picture', verifyToken, upload.single('profilePictu
       return res.status(400).json({ message: 'Şəkil seçilməyib' });
     }
     
-    const user = await User.findById(req.user._id);
+    const user = db.users.find(u => u._id === req.user._id);
     user.profilePicture = '/uploads/' + req.file.filename;
-    await user.save();
     
     res.json({ profilePicture: user.profilePicture });
   } catch (error) {
@@ -418,8 +342,9 @@ app.post('/api/upload-profile-picture', verifyToken, upload.single('profilePictu
 // Get user profile
 app.get('/api/user/profile', verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
-    res.json(user);
+    const user = db.users.find(u => u._id === req.user._id);
+    const { password, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
   }
@@ -430,13 +355,11 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
   try {
     const { fullName, faculty, degree, course } = req.body;
     
-    const user = await User.findById(req.user._id);
+    const user = db.users.find(u => u._id === req.user._id);
     if (fullName) user.fullName = fullName;
     if (faculty) user.faculty = faculty;
     if (degree) user.degree = degree;
     if (course) user.course = course;
-    
-    await user.save();
     
     res.json({
       user: {
@@ -457,12 +380,11 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
 // Block user
 app.post('/api/user/block/:userId', verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = db.users.find(u => u._id === req.user._id);
     const targetUserId = req.params.userId;
     
     if (!user.blockedUsers.includes(targetUserId)) {
       user.blockedUsers.push(targetUserId);
-      await user.save();
     }
     
     res.json({ message: 'İstifadəçi əngəlləndi' });
@@ -474,9 +396,8 @@ app.post('/api/user/block/:userId', verifyToken, async (req, res) => {
 // Unblock user
 app.post('/api/user/unblock/:userId', verifyToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    user.blockedUsers = user.blockedUsers.filter(id => id.toString() !== req.params.userId);
-    await user.save();
+    const user = db.users.find(u => u._id === req.user._id);
+    user.blockedUsers = user.blockedUsers.filter(id => id !== req.params.userId);
     
     res.json({ message: 'Əngəl qaldırıldı' });
   } catch (error) {
@@ -488,10 +409,12 @@ app.post('/api/user/unblock/:userId', verifyToken, async (req, res) => {
 app.post('/api/user/report/:userId', verifyToken, async (req, res) => {
   try {
     const { reason } = req.body;
-    await Report.create({
+    db.reports.push({
+      _id: generateId(),
       reportedUserId: req.params.userId,
       reporterId: req.user._id,
-      reason
+      reason,
+      createdAt: new Date()
     });
     
     res.json({ message: 'Şikayət göndərildi' });
@@ -503,20 +426,26 @@ app.post('/api/user/report/:userId', verifyToken, async (req, res) => {
 // Get group messages
 app.get('/api/messages/group/:faculty', verifyToken, async (req, res) => {
   try {
-    const messages = await Message.find({
-      type: 'group',
-      facultyId: req.params.faculty
-    })
-    .populate('senderId', 'fullName faculty degree course profilePicture')
-    .sort({ createdAt: 1 })
-    .limit(100);
+    const messages = db.messages
+      .filter(m => m.type === 'group' && m.facultyId === req.params.faculty)
+      .map(m => {
+        const sender = db.users.find(u => u._id === m.senderId);
+        return {
+          ...m,
+          senderId: {
+            _id: sender._id,
+            fullName: sender.fullName,
+            faculty: sender.faculty,
+            degree: sender.degree,
+            course: sender.course,
+            profilePicture: sender.profilePicture
+          }
+        };
+      })
+      .filter(m => !req.user.blockedUsers.includes(m.senderId._id))
+      .slice(-100);
     
-    // Filter out messages from blocked users
-    const filteredMessages = messages.filter(msg => 
-      !req.user.blockedUsers.includes(msg.senderId._id.toString())
-    );
-    
-    res.json(filteredMessages);
+    res.json(messages);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
   }
@@ -525,17 +454,36 @@ app.get('/api/messages/group/:faculty', verifyToken, async (req, res) => {
 // Get private messages
 app.get('/api/messages/private/:userId', verifyToken, async (req, res) => {
   try {
-    const messages = await Message.find({
-      type: 'private',
-      $or: [
-        { senderId: req.user._id, receiverId: req.params.userId },
-        { senderId: req.params.userId, receiverId: req.user._id }
-      ]
-    })
-    .populate('senderId', 'fullName faculty degree course profilePicture')
-    .populate('receiverId', 'fullName faculty degree course profilePicture')
-    .sort({ createdAt: 1 })
-    .limit(100);
+    const messages = db.messages
+      .filter(m => 
+        m.type === 'private' && 
+        ((m.senderId === req.user._id && m.receiverId === req.params.userId) ||
+         (m.senderId === req.params.userId && m.receiverId === req.user._id))
+      )
+      .map(m => {
+        const sender = db.users.find(u => u._id === m.senderId);
+        const receiver = db.users.find(u => u._id === m.receiverId);
+        return {
+          ...m,
+          senderId: {
+            _id: sender._id,
+            fullName: sender.fullName,
+            faculty: sender.faculty,
+            degree: sender.degree,
+            course: sender.course,
+            profilePicture: sender.profilePicture
+          },
+          receiverId: {
+            _id: receiver._id,
+            fullName: receiver.fullName,
+            faculty: receiver.faculty,
+            degree: receiver.degree,
+            course: receiver.course,
+            profilePicture: receiver.profilePicture
+          }
+        };
+      })
+      .slice(-100);
     
     res.json(messages);
   } catch (error) {
@@ -546,8 +494,7 @@ app.get('/api/messages/private/:userId', verifyToken, async (req, res) => {
 // Get settings
 app.get('/api/settings', async (req, res) => {
   try {
-    const settings = await Settings.findOne();
-    res.json(settings);
+    res.json(db.settings);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
   }
@@ -560,7 +507,10 @@ app.get('/api/admin/users', verifyToken, async (req, res) => {
       return res.status(403).json({ message: 'Yetkisiz giriş' });
     }
     
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    const users = db.users.map(u => {
+      const { password, ...userWithoutPassword } = u;
+      return userWithoutPassword;
+    });
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
@@ -574,9 +524,8 @@ app.put('/api/admin/users/:userId/toggle-active', verifyToken, async (req, res) 
       return res.status(403).json({ message: 'Yetkisiz giriş' });
     }
     
-    const user = await User.findById(req.params.userId);
+    const user = db.users.find(u => u._id === req.params.userId);
     user.isActive = !user.isActive;
-    await user.save();
     
     res.json({ message: 'Status dəyişdirildi', isActive: user.isActive });
   } catch (error) {
@@ -591,30 +540,23 @@ app.get('/api/admin/reported-users', verifyToken, async (req, res) => {
       return res.status(403).json({ message: 'Yetkisiz giriş' });
     }
     
-    const reports = await Report.aggregate([
-      {
-        $group: {
-          _id: '$reportedUserId',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $match: { count: { $gte: 16 } }
-      }
-    ]);
-    
-    const reportedUserIds = reports.map(r => r._id);
-    const users = await User.find({ _id: { $in: reportedUserIds } }).select('-password');
-    
-    const usersWithReportCount = users.map(user => {
-      const report = reports.find(r => r._id.toString() === user._id.toString());
-      return {
-        ...user.toObject(),
-        reportCount: report.count
-      };
+    const reportCounts = {};
+    db.reports.forEach(r => {
+      reportCounts[r.reportedUserId] = (reportCounts[r.reportedUserId] || 0) + 1;
     });
     
-    res.json(usersWithReportCount);
+    const reportedUsers = Object.entries(reportCounts)
+      .filter(([userId, count]) => count >= 16)
+      .map(([userId, count]) => {
+        const user = db.users.find(u => u._id === userId);
+        const { password, ...userWithoutPassword } = user;
+        return {
+          ...userWithoutPassword,
+          reportCount: count
+        };
+      });
+    
+    res.json(reportedUsers);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
   }
@@ -629,29 +571,21 @@ app.put('/api/admin/settings', verifyToken, async (req, res) => {
     
     const { rules, dailyTopic, filterWords, groupMessageExpiry, privateMessageExpiry } = req.body;
     
-    let settings = await Settings.findOne();
-    if (!settings) {
-      settings = new Settings();
-    }
+    if (rules !== undefined) db.settings.rules = rules;
+    if (dailyTopic !== undefined) db.settings.dailyTopic = dailyTopic;
+    if (filterWords !== undefined) db.settings.filterWords = filterWords;
+    if (groupMessageExpiry !== undefined) db.settings.groupMessageExpiry = groupMessageExpiry;
+    if (privateMessageExpiry !== undefined) db.settings.privateMessageExpiry = privateMessageExpiry;
     
-    if (rules !== undefined) settings.rules = rules;
-    if (dailyTopic !== undefined) settings.dailyTopic = dailyTopic;
-    if (filterWords !== undefined) settings.filterWords = filterWords;
-    if (groupMessageExpiry !== undefined) settings.groupMessageExpiry = groupMessageExpiry;
-    if (privateMessageExpiry !== undefined) settings.privateMessageExpiry = privateMessageExpiry;
+    io.emit('settings-updated', db.settings);
     
-    await settings.save();
-    
-    // Broadcast settings update to all connected clients
-    io.emit('settings-updated', settings);
-    
-    res.json(settings);
+    res.json(db.settings);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
   }
 });
 
-// Admin: Create sub-admin (only super admin)
+// Admin: Create sub-admin
 app.post('/api/admin/sub-admin', verifyToken, async (req, res) => {
   try {
     if (!req.admin || !req.admin.isSuperAdmin) {
@@ -660,17 +594,21 @@ app.post('/api/admin/sub-admin', verifyToken, async (req, res) => {
     
     const { username, password } = req.body;
     
-    const existingAdmin = await Admin.findOne({ username });
+    const existingAdmin = db.admins.find(a => a.username === username);
     if (existingAdmin) {
       return res.status(400).json({ message: 'Bu istifadəçi adı artıq mövcuddur' });
     }
     
     const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = await Admin.create({
+    const admin = {
+      _id: generateId(),
       username,
       password: hashedPassword,
-      isSuperAdmin: false
-    });
+      isSuperAdmin: false,
+      createdAt: new Date()
+    };
+    
+    db.admins.push(admin);
     
     res.status(201).json({ message: 'Alt admin yaradıldı', admin: { id: admin._id, username: admin.username } });
   } catch (error) {
@@ -678,14 +616,14 @@ app.post('/api/admin/sub-admin', verifyToken, async (req, res) => {
   }
 });
 
-// Admin: Delete sub-admin (only super admin)
+// Admin: Delete sub-admin
 app.delete('/api/admin/sub-admin/:adminId', verifyToken, async (req, res) => {
   try {
     if (!req.admin || !req.admin.isSuperAdmin) {
       return res.status(403).json({ message: 'Yetkisiz giriş' });
     }
     
-    const admin = await Admin.findById(req.params.adminId);
+    const admin = db.admins.find(a => a._id === req.params.adminId);
     if (!admin) {
       return res.status(404).json({ message: 'Admin tapılmadı' });
     }
@@ -694,21 +632,24 @@ app.delete('/api/admin/sub-admin/:adminId', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'Super admin silinə bilməz' });
     }
     
-    await Admin.findByIdAndDelete(req.params.adminId);
+    db.admins = db.admins.filter(a => a._id !== req.params.adminId);
     res.json({ message: 'Alt admin silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
   }
 });
 
-// Admin: Get all admins (only super admin)
+// Admin: Get all admins
 app.get('/api/admin/list', verifyToken, async (req, res) => {
   try {
     if (!req.admin || !req.admin.isSuperAdmin) {
       return res.status(403).json({ message: 'Yetkisiz giriş' });
     }
     
-    const admins = await Admin.find().select('-password');
+    const admins = db.admins.map(a => {
+      const { password, ...adminWithoutPassword } = a;
+      return adminWithoutPassword;
+    });
     res.json(admins);
   } catch (error) {
     res.status(500).json({ message: 'Server xətası' });
@@ -719,35 +660,45 @@ app.get('/api/admin/list', verifyToken, async (req, res) => {
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   
-  // Join faculty room
   socket.on('join-faculty', (faculty) => {
     socket.join(faculty);
     console.log(`User ${socket.id} joined faculty: ${faculty}`);
   });
   
-  // Send group message
   socket.on('send-group-message', async (data) => {
     try {
       const { token, faculty, content } = data;
       const decoded = jwt.verify(token, JWT_SECRET);
-      const user = await User.findById(decoded.userId).select('-password');
+      const user = db.users.find(u => u._id === decoded.userId);
       
       if (!user || !user.isActive) {
         return;
       }
       
-      // Filter profanity
-      const filteredContent = await filterProfanity(content);
+      const filteredContent = filterProfanity(content);
       
-      const message = await Message.create({
+      const message = {
+        _id: generateId(),
         senderId: user._id,
         facultyId: faculty,
         content: filteredContent,
-        type: 'group'
-      });
+        type: 'group',
+        createdAt: new Date()
+      };
       
-      const populatedMessage = await Message.findById(message._id)
-        .populate('senderId', 'fullName faculty degree course profilePicture');
+      db.messages.push(message);
+      
+      const populatedMessage = {
+        ...message,
+        senderId: {
+          _id: user._id,
+          fullName: user.fullName,
+          faculty: user.faculty,
+          degree: user.degree,
+          course: user.course,
+          profilePicture: user.profilePicture
+        }
+      };
       
       io.to(faculty).emit('new-group-message', populatedMessage);
     } catch (error) {
@@ -755,38 +706,54 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Send private message
   socket.on('send-private-message', async (data) => {
     try {
       const { token, receiverId, content } = data;
       const decoded = jwt.verify(token, JWT_SECRET);
-      const user = await User.findById(decoded.userId).select('-password');
-      const receiver = await User.findById(receiverId);
+      const user = db.users.find(u => u._id === decoded.userId);
+      const receiver = db.users.find(u => u._id === receiverId);
       
       if (!user || !user.isActive || !receiver) {
         return;
       }
       
-      // Check if blocked
-      if (receiver.blockedUsers.includes(user._id.toString())) {
+      if (receiver.blockedUsers.includes(user._id)) {
         return;
       }
       
-      // Filter profanity
-      const filteredContent = await filterProfanity(content);
+      const filteredContent = filterProfanity(content);
       
-      const message = await Message.create({
+      const message = {
+        _id: generateId(),
         senderId: user._id,
         receiverId: receiverId,
         content: filteredContent,
-        type: 'private'
-      });
+        type: 'private',
+        createdAt: new Date()
+      };
       
-      const populatedMessage = await Message.findById(message._id)
-        .populate('senderId', 'fullName faculty degree course profilePicture')
-        .populate('receiverId', 'fullName faculty degree course profilePicture');
+      db.messages.push(message);
       
-      // Send to both sender and receiver
+      const populatedMessage = {
+        ...message,
+        senderId: {
+          _id: user._id,
+          fullName: user.fullName,
+          faculty: user.faculty,
+          degree: user.degree,
+          course: user.course,
+          profilePicture: user.profilePicture
+        },
+        receiverId: {
+          _id: receiver._id,
+          fullName: receiver.fullName,
+          faculty: receiver.faculty,
+          degree: receiver.degree,
+          course: receiver.course,
+          profilePicture: receiver.profilePicture
+        }
+      };
+      
       socket.emit('new-private-message', populatedMessage);
       socket.to(receiverId).emit('new-private-message', populatedMessage);
     } catch (error) {
@@ -802,27 +769,24 @@ io.on('connection', (socket) => {
 // Message cleanup job
 setInterval(async () => {
   try {
-    const settings = await Settings.findOne();
-    if (!settings) return;
+    const groupExpiryDate = new Date(Date.now() - db.settings.groupMessageExpiry * 60 * 60 * 1000);
+    const privateExpiryDate = new Date(Date.now() - db.settings.privateMessageExpiry * 60 * 60 * 1000);
     
-    const groupExpiryDate = new Date(Date.now() - settings.groupMessageExpiry * 60 * 60 * 1000);
-    const privateExpiryDate = new Date(Date.now() - settings.privateMessageExpiry * 60 * 60 * 1000);
-    
-    await Message.deleteMany({
-      type: 'group',
-      createdAt: { $lt: groupExpiryDate }
-    });
-    
-    await Message.deleteMany({
-      type: 'private',
-      createdAt: { $lt: privateExpiryDate }
+    db.messages = db.messages.filter(m => {
+      if (m.type === 'group' && m.createdAt < groupExpiryDate) {
+        return false;
+      }
+      if (m.type === 'private' && m.createdAt < privateExpiryDate) {
+        return false;
+      }
+      return true;
     });
     
     console.log('Message cleanup completed');
   } catch (error) {
     console.error('Message cleanup error:', error);
   }
-}, 60 * 60 * 1000); // Run every hour
+}, 60 * 60 * 1000);
 
 // Serve static files
 app.get('*', (req, res) => {
@@ -833,4 +797,5 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });

@@ -6,7 +6,11 @@
     "start": "node server.js",
     "dev": "node server.js"
   },
-  "keywords": ["bsu", "chat", "university"],
+  "keywords": [
+    "bsu",
+    "chat",
+    "university"
+  ],
   "author": "",
   "license": "ISC",
   "description": "Bakı Dövlət Universiteti Chat Sistemi",
@@ -16,8 +20,10 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.1.3",
     "multer": "^2.0.2",
     "socket.io": "^4.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
