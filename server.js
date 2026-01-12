@@ -788,8 +788,8 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000);
 
-// Serve static files
-app.get('*', (req, res) => {
+// Serve index.html for all unmatched routes (SPA fallback)
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
