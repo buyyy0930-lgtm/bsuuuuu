@@ -350,6 +350,20 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
   }
 });
 
+// Get user by ID
+app.get('/api/user/:userId', verifyToken, async (req, res) => {
+  try {
+    const user = db.users.find(u => u._id === req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'İstifadəçi tapılmadı' });
+    }
+    const { password, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    res.status(500).json({ message: 'Server xətası' });
+  }
+});
+
 // Update user profile
 app.put('/api/user/profile', verifyToken, async (req, res) => {
   try {

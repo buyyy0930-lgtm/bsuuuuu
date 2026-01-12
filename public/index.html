@@ -97,7 +97,6 @@
                         <input type="password" name="password" placeholder="Şifrə" required>
                         
                         <button type="submit" class="btn-primary">Növbəti</button>
-                        <button type="button" class="btn-secondary">Assalamu aleykum, Tanışlıqlara xoş gəlmisiniz</button>
                     </form>
                 </div>
             </div>
@@ -219,6 +218,25 @@
                 </select>
                 <button type="submit" class="btn-primary">Yenilə</button>
             </form>
+            
+            <h3 style="margin-top: 30px;">Əngəllənmiş İstifadəçilər</h3>
+            <div id="blocked-users-list"></div>
+        </div>
+    </div>
+    
+    <!-- Private Chat Page -->
+    <div id="private-chat-page" class="page">
+        <div class="chat-header">
+            <button onclick="closePrivateChat()" class="back-btn">←</button>
+            <h3 id="private-chat-title"></h3>
+            <div class="header-actions">
+                <button onclick="showPrivateChatMenu()" class="icon-btn">⋮</button>
+            </div>
+        </div>
+        <div class="messages-container" id="private-messages-container"></div>
+        <div class="message-input-container">
+            <input type="text" id="private-message-input" placeholder="Mesaj yazın...">
+            <button onclick="sendPrivateMessage()" class="send-btn">📤</button>
         </div>
     </div>
     

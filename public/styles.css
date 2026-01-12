@@ -334,8 +334,13 @@ body {
 }
 
 /* Chat Page */
-#chat-page {
+#chat-page,
+#private-chat-page {
     background: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .chat-header {
@@ -345,6 +350,7 @@ body {
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-shrink: 0;
 }
 
 .back-btn {
@@ -366,13 +372,26 @@ body {
     font-size: 18px;
 }
 
+.daily-topic {
+    background: #FFF9C4;
+    padding: 15px 20px;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
 .messages-container {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 15px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
 }
 
 .message {
@@ -454,6 +473,9 @@ body {
     display: flex;
     gap: 10px;
     border-top: 1px solid #e0e0e0;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 
 .message-input-container input {
@@ -462,6 +484,7 @@ body {
     border: 1px solid #e0e0e0;
     border-radius: 24px;
     font-size: 16px;
+    min-height: 45px;
 }
 
 .send-btn {
@@ -508,6 +531,52 @@ body {
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
+}
+
+/* Blocked Users List */
+#blocked-users-list {
+    margin-top: 15px;
+}
+
+.blocked-user-item {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.blocked-user-info {
+    flex: 1;
+    font-size: 14px;
+}
+
+.blocked-user-info strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.blocked-user-info span {
+    color: #666;
+    font-size: 12px;
+}
+
+.unblock-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.unblock-btn:hover {
+    background: #45a049;
 }
 
 /* Modal */

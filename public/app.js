@@ -3,14 +3,16 @@ let socket;
 let currentUser = null;
 let currentAdmin = null;
 let currentFaculty = null;
+let currentPrivateChatUser = null;
 let selectedUser = null;
+let selectedUserData = null;
 let registrationData = null;
+let isScrolledUp = false;
 
 const API_URL = window.location.origin;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-    // Check for existing tokens
     const userToken = localStorage.getItem('userToken');
     const adminToken = localStorage.getItem('adminToken');
     
@@ -22,12 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showPage('landing-page');
     }
     
-    // Setup event listeners
     setupEventListeners();
 });
 
 function setupEventListeners() {
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.dataset.tab;
@@ -38,39 +38,42 @@ function setupEventListeners() {
         });
     });
     
-    // Login form
     document.getElementById('login-form').addEventListener('submit', handleLogin);
-    
-    // Register form
     document.getElementById('register-form').addEventListener('submit', handleRegister);
-    
-    // Admin login form
     document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
-    
-    // Verification form
     document.getElementById('verification-form').addEventListener('submit', handleVerification);
-    
-    // Profile form
     document.getElementById('profile-form').addEventListener('submit', handleProfileUpdate);
-    
-    // Profile picture upload
     document.getElementById('profile-picture-input').addEventListener('change', handleProfilePictureUpload);
     
-    // Message input enter key
     document.getElementById('message-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             sendMessage();
         }
     });
     
-    // Create subadmin form
+    document.getElementById('private-message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendPrivateMessage();
+        }
+    });
+    
+    // Track scroll position
+    const messagesContainer = document.getElementById('messages-container');
+    if (messagesContainer) {
+        messagesContainer.addEventListener('scroll', () => {
+            const isAtBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop <= messagesContainer.clientHeight + 100;
+            isScrolledUp = !isAtBottom;
+        });
+    }
+    
     const subadminForm = document.getElementById('create-subadmin-form');
     if (subadminForm) {
         subadminForm.addEventListener('submit', handleCreateSubAdmin);
     }
 }
 
-// Page navigation
 function showPage(pageId) {
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
@@ -126,7 +129,6 @@ async function handleRegister(e) {
         password: formData.get('password')
     };
     
-    // Load verification questions
     try {
         const response = await fetch(`${API_URL}/api/verification-questions`);
         const questions = await response.json();
@@ -182,7 +184,6 @@ async function handleVerification(e) {
             return;
         }
         
-        // Proceed with registration
         const registerResponse = await fetch(`${API_URL}/api/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -263,7 +264,6 @@ async function verifyAdminToken(token) {
         });
         
         if (response.ok) {
-            // Token is valid, extract admin info
             const payload = JSON.parse(atob(token.split('.')[1]));
             currentAdmin = {
                 id: payload.adminId,
@@ -310,12 +310,19 @@ function initializeSocket() {
     
     socket.on('new-group-message', (message) => {
         if (currentFaculty === message.facultyId) {
-            appendMessage(message);
+            if (!currentUser.blockedUsers.includes(message.senderId._id)) {
+                appendMessage(message, false);
+            }
         }
     });
     
     socket.on('new-private-message', (message) => {
-        appendMessage(message);
+        if (currentPrivateChatUser) {
+            const isRelevant = (message.senderId._id === currentPrivateChatUser || message.receiverId._id === currentPrivateChatUser);
+            if (isRelevant && !currentUser.blockedUsers.includes(message.senderId._id)) {
+                appendPrivateMessage(message, false);
+            }
+        }
     });
     
     socket.on('settings-updated', (settings) => {
@@ -327,7 +334,6 @@ function initializeSocket() {
 async function showFacultyPage() {
     showPage('faculty-page');
     
-    // Load settings
     try {
         const response = await fetch(`${API_URL}/api/settings`);
         const settings = await response.json();
@@ -336,7 +342,6 @@ async function showFacultyPage() {
         console.error('Error loading settings:', error);
     }
     
-    // Display faculties
     const faculties = [
         { name: "Mexanika-riyaziyyat fakültəsi", icon: "🔢", desc: "Məz. və rir." },
         { name: "Tətbiqi riyaziyyat və kibernetika fakültəsi", icon: "💻", desc: "Tətbiqi rir." },
@@ -367,19 +372,25 @@ async function showFacultyPage() {
 }
 
 function updateDailyTopic(topic) {
-    document.getElementById('daily-topic').textContent = topic || '';
-    document.getElementById('chat-daily-topic').textContent = topic || '';
+    const topicElements = document.querySelectorAll('#daily-topic, #chat-daily-topic');
+    topicElements.forEach(el => {
+        if (topic) {
+            el.textContent = topic;
+            el.style.display = 'block';
+        } else {
+            el.style.display = 'none';
+        }
+    });
 }
 
 async function joinFaculty(faculty) {
     currentFaculty = faculty;
+    currentPrivateChatUser = null;
     document.getElementById('chat-title').textContent = faculty;
     showPage('chat-page');
     
-    // Join socket room
     socket.emit('join-faculty', faculty);
     
-    // Load messages
     try {
         const token = localStorage.getItem('userToken');
         const response = await fetch(`${API_URL}/api/messages/group/${encodeURIComponent(faculty)}`, {
@@ -389,8 +400,8 @@ async function joinFaculty(faculty) {
         
         const container = document.getElementById('messages-container');
         container.innerHTML = '';
-        messages.forEach(msg => appendMessage(msg));
-        scrollToBottom();
+        messages.forEach(msg => appendMessage(msg, true));
+        scrollToBottom('messages-container');
     } catch (error) {
         console.error('Error loading messages:', error);
     }
@@ -402,7 +413,7 @@ function backToFacultyList() {
 }
 
 // Messaging
-function appendMessage(message) {
+function appendMessage(message, isInitialLoad = false) {
     const container = document.getElementById('messages-container');
     const time = new Date(message.createdAt).toLocaleTimeString('az-AZ', {
         hour: '2-digit',
@@ -416,7 +427,7 @@ function appendMessage(message) {
         <div class="message-content">
             <div class="message-header">
                 <span class="message-sender">${message.senderId.fullName}</span>
-                <button class="message-menu" onclick="showUserMenu('${message.senderId._id}')">⋮</button>
+                <button class="message-menu" onclick="showUserMenu('${message.senderId._id}', '${message.senderId.fullName.replace(/'/g, "\\'")}', '${message.senderId.faculty}', '${message.senderId.degree}', ${message.senderId.course}, '${message.senderId.profilePicture || '/default-avatar.png'}')">⋮</button>
             </div>
             <div class="message-info">${message.senderId.faculty} - ${message.senderId.degree} - ${message.senderId.course}-ci kurs</div>
             <div class="message-text">${message.content}</div>
@@ -425,12 +436,19 @@ function appendMessage(message) {
     `;
     
     container.appendChild(messageDiv);
-    scrollToBottom();
+    
+    if (!isInitialLoad && !isScrolledUp) {
+        scrollToBottom('messages-container');
+    }
 }
 
-function scrollToBottom() {
-    const container = document.getElementById('messages-container');
-    container.scrollTop = container.scrollHeight;
+function scrollToBottom(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        setTimeout(() => {
+            container.scrollTop = container.scrollHeight;
+        }, 100);
+    }
 }
 
 function sendMessage() {
@@ -450,28 +468,105 @@ function sendMessage() {
 }
 
 // User menu
-function showUserMenu(userId) {
-    selectedUser = userId;
+function showUserMenu(userId, fullName, faculty, degree, course, profilePicture) {
+    if (userId === currentUser.id) return;
     
-    // Fetch user details
-    fetch(`${API_URL}/api/user/profile`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken')}` }
-    }).then(res => res.json()).then(user => {
-        // For now, show menu with basic info
-        document.getElementById('menu-user-name').textContent = 'İstifadəçi';
-        document.getElementById('menu-user-info').textContent = 'Məlumat yüklənir...';
-        document.getElementById('user-menu-modal').classList.add('active');
-    });
+    selectedUser = userId;
+    selectedUserData = { fullName, faculty, degree, course, profilePicture };
+    
+    document.getElementById('menu-user-avatar').src = profilePicture;
+    document.getElementById('menu-user-name').textContent = fullName;
+    document.getElementById('menu-user-info').textContent = `${faculty} - ${degree} - ${course}-ci kurs`;
+    document.getElementById('user-menu-modal').classList.add('active');
 }
 
 function closeUserMenu() {
     document.getElementById('user-menu-modal').classList.remove('active');
     selectedUser = null;
+    selectedUserData = null;
 }
 
 async function startPrivateChat() {
+    if (!selectedUser) return;
+    
     closeUserMenu();
-    alert('Şəxsi chat funksiyası tezliklə əlavə ediləcək');
+    
+    currentPrivateChatUser = selectedUser;
+    currentFaculty = null;
+    
+    document.getElementById('private-chat-title').textContent = selectedUserData.fullName;
+    showPage('private-chat-page');
+    
+    try {
+        const token = localStorage.getItem('userToken');
+        const response = await fetch(`${API_URL}/api/messages/private/${selectedUser}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const messages = await response.json();
+        
+        const container = document.getElementById('private-messages-container');
+        container.innerHTML = '';
+        messages.forEach(msg => appendPrivateMessage(msg, true));
+        scrollToBottom('private-messages-container');
+    } catch (error) {
+        console.error('Error loading private messages:', error);
+    }
+}
+
+function appendPrivateMessage(message, isInitialLoad = false) {
+    const container = document.getElementById('private-messages-container');
+    const time = new Date(message.createdAt).toLocaleTimeString('az-AZ', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    const isSent = message.senderId._id === currentUser.id;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message';
+    messageDiv.innerHTML = `
+        <img src="${message.senderId.profilePicture || '/default-avatar.png'}" alt="Avatar" class="message-avatar">
+        <div class="message-content">
+            <div class="message-header">
+                <span class="message-sender">${message.senderId.fullName}</span>
+            </div>
+            <div class="message-info">${message.senderId.faculty} - ${message.senderId.degree} - ${message.senderId.course}-ci kurs</div>
+            <div class="message-text">${message.content}</div>
+            <div class="message-time">${time}</div>
+        </div>
+    `;
+    
+    container.appendChild(messageDiv);
+    
+    if (!isInitialLoad && !isScrolledUp) {
+        scrollToBottom('private-messages-container');
+    }
+}
+
+function sendPrivateMessage() {
+    const input = document.getElementById('private-message-input');
+    const content = input.value.trim();
+    
+    if (!content) return;
+    
+    const token = localStorage.getItem('userToken');
+    socket.emit('send-private-message', {
+        token,
+        receiverId: currentPrivateChatUser,
+        content
+    });
+    
+    input.value = '';
+}
+
+function closePrivateChat() {
+    currentPrivateChatUser = null;
+    showFacultyPage();
+}
+
+function showPrivateChatMenu() {
+    // Show block/report options
+    alert('Menyu funksiyası');
 }
 
 async function blockUser() {
@@ -486,6 +581,12 @@ async function blockUser() {
         
         const data = await response.json();
         alert(data.message);
+        
+        if (!currentUser.blockedUsers) {
+            currentUser.blockedUsers = [];
+        }
+        currentUser.blockedUsers.push(selectedUser);
+        
         closeUserMenu();
     } catch (error) {
         console.error('Block error:', error);
@@ -523,7 +624,6 @@ async function reportUser() {
 function showProfile() {
     showPage('profile-page');
     
-    // Load current user data
     document.getElementById('profile-fullname').value = currentUser.fullName;
     document.getElementById('profile-faculty').value = currentUser.faculty;
     document.getElementById('profile-degree').value = currentUser.degree;
@@ -531,6 +631,78 @@ function showProfile() {
     
     if (currentUser.profilePicture) {
         document.getElementById('profile-picture').src = currentUser.profilePicture;
+    }
+    
+    loadBlockedUsers();
+}
+
+async function loadBlockedUsers() {
+    try {
+        const token = localStorage.getItem('userToken');
+        const response = await fetch(`${API_URL}/api/user/profile`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const userData = await response.json();
+        
+        currentUser.blockedUsers = userData.blockedUsers || [];
+        
+        const blockedList = document.getElementById('blocked-users-list');
+        
+        if (currentUser.blockedUsers.length === 0) {
+            blockedList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Əngəllənmiş istifadəçi yoxdur</p>';
+            return;
+        }
+        
+        const usersPromises = currentUser.blockedUsers.map(async (userId) => {
+            try {
+                const res = await fetch(`${API_URL}/api/user/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    return await res.json();
+                }
+            } catch (e) {
+                return null;
+            }
+        });
+        
+        const users = await Promise.all(usersPromises);
+        const validUsers = users.filter(u => u !== null && u !== undefined);
+        
+        if (validUsers.length === 0) {
+            blockedList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Əngəllənmiş istifadəçi yoxdur</p>';
+        } else {
+            blockedList.innerHTML = validUsers.map(user => `
+                <div class="blocked-user-item">
+                    <div class="blocked-user-info">
+                        <strong>${user.fullName}</strong>
+                        <span>${user.email}</span>
+                    </div>
+                    <button class="unblock-btn" onclick="unblockUser('${user._id}')">Əngəli Aç</button>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading blocked users:', error);
+    }
+}
+
+async function unblockUser(userId) {
+    try {
+        const token = localStorage.getItem('userToken');
+        const response = await fetch(`${API_URL}/api/user/unblock/${userId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const data = await response.json();
+        alert(data.message);
+        
+        currentUser.blockedUsers = currentUser.blockedUsers.filter(id => id !== userId);
+        loadBlockedUsers();
+    } catch (error) {
+        console.error('Unblock error:', error);
+        alert('Server xətası');
     }
 }
 
@@ -597,7 +769,6 @@ async function handleProfileUpdate(e) {
         if (response.ok) {
             currentUser = data.user;
             alert('Profil yeniləndi');
-            showFacultyPage();
         } else {
             alert(data.message || 'Yeniləmə uğursuz oldu');
         }
@@ -628,15 +799,11 @@ function closeRules() {
 async function showAdminPanel() {
     showPage('admin-page');
     
-    // Show subadmin menu only for super admin
     if (currentAdmin.isSuperAdmin) {
         document.getElementById('subadmin-menu').style.display = 'block';
     }
     
-    // Load users
     loadAdminUsers();
-    
-    // Load settings
     loadAdminSettings();
 }
 
@@ -665,11 +832,9 @@ async function loadAdminUsers() {
         
         const users = await response.json();
         
-        // Update statistics
         document.getElementById('total-users').textContent = users.length;
         document.getElementById('active-users').textContent = users.filter(u => u.isActive).length;
         
-        // Display users
         const usersList = document.getElementById('users-list');
         usersList.innerHTML = users.map(user => `
             <div class="user-row ${!user.isActive ? 'inactive' : ''}">
