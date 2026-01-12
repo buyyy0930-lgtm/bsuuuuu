@@ -1,14 +1,15 @@
 {
-  "name": "webapp",
+  "name": "bsu-chat",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
-  "keywords": [],
+  "keywords": ["bsu", "chat", "university"],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Bakı Dövlət Universiteti Chat Sistemi",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",

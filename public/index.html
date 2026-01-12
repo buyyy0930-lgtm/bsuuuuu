@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BSU Chat</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landing-page" class="page active">
+        <div class="landing-content">
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="login">Giriş</button>
+                <button class="tab-btn" data-tab="register">Qeydiyyat</button>
+                <button class="tab-btn" data-tab="admin">Admin Paneli</button>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="login-tab" class="tab-content active">
+                <div class="auth-card">
+                    <div class="auth-icon">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L3 7V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V7L12 2Z" fill="#FF4C4C"/>
+                        </svg>
+                    </div>
+                    <h2>Admin Paneli</h2>
+                    <form id="login-form">
+                        <input type="email" name="email" placeholder="email@example.com" required>
+                        <input type="password" name="password" placeholder="Şifrə" required>
+                        <button type="submit" class="btn-primary">Daxil ol</button>
+                        <button type="button" class="btn-secondary" onclick="resetForm()">Çıxış</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Register Form -->
+            <div id="register-tab" class="tab-content">
+                <div class="auth-card">
+                    <div class="auth-icon">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 3L1 9L12 15L21 10.09V17H23V9M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z" fill="#4285F4"/>
+                        </svg>
+                    </div>
+                    <h2>BSU Chat</h2>
+                    <p class="subtitle">Qeyd ol</p>
+                    <form id="register-form">
+                        <input type="text" name="fullName" placeholder="Ad və Soyad" required>
+                        
+                        <div class="email-input-wrapper">
+                            <input type="text" name="emailPrefix" placeholder="email" required>
+                            <span class="email-suffix">@bsu.edu.az</span>
+                        </div>
+                        
+                        <div class="phone-input-wrapper">
+                            <span class="phone-prefix">+994</span>
+                            <input type="tel" name="phone" placeholder="501234567" maxlength="9" pattern="[0-9]{9}" required>
+                        </div>
+                        
+                        <select name="faculty" required>
+                            <option value="">Fakültə seçin</option>
+                            <option value="Mexanika-riyaziyyat fakültəsi">Mexanika-riyaziyyat fakültəsi</option>
+                            <option value="Tətbiqi riyaziyyat və kibernetika fakültəsi">Tətbiqi riyaziyyat və kibernetika fakültəsi</option>
+                            <option value="Fizika fakültəsi">Fizika fakültəsi</option>
+                            <option value="Kimya fakültəsi">Kimya fakültəsi</option>
+                            <option value="Biologiya fakültəsi">Biologiya fakültəsi</option>
+                            <option value="Ekologiya və torpaqşünaslıq fakültəsi">Ekologiya və torpaqşünaslıq fakültəsi</option>
+                            <option value="Coğrafiya fakültəsi">Coğrafiya fakültəsi</option>
+                            <option value="Geologiya fakültəsi">Geologiya fakültəsi</option>
+                            <option value="Filologiya fakültəsi">Filologiya fakültəsi</option>
+                            <option value="Tarix fakültəsi">Tarix fakültəsi</option>
+                            <option value="Beynəlxalq münasibətlər və iqtisadiyyat fakültəsi">Beynəlxalq münasibətlər və iqtisadiyyat fakültəsi</option>
+                            <option value="Hüquq fakültəsi">Hüquq fakültəsi</option>
+                            <option value="Jurnalistika fakültəsi">Jurnalistika fakültəsi</option>
+                            <option value="İnformasiya və sənəd menecmenti fakültəsi">İnformasiya və sənəd menecmenti fakültəsi</option>
+                            <option value="Şərqşünaslıq fakültəsi">Şərqşünaslıq fakültəsi</option>
+                            <option value="Sosial elmlər və psixologiya fakültəsi">Sosial elmlər və psixologiya fakültəsi</option>
+                        </select>
+                        
+                        <select name="degree" required>
+                            <option value="">Dərəcə seçin</option>
+                            <option value="Bakalavr">Bakalavr</option>
+                            <option value="Magistr">Magistr</option>
+                            <option value="Doktorantura">Doktorantura</option>
+                        </select>
+                        
+                        <select name="course" required>
+                            <option value="">Kurs seçin</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                        </select>
+                        
+                        <input type="password" name="password" placeholder="Şifrə" required>
+                        
+                        <button type="submit" class="btn-primary">Növbəti</button>
+                        <button type="button" class="btn-secondary">Assalamu aleykum, Tanışlıqlara xoş gəlmisiniz</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Admin Login Form -->
+            <div id="admin-tab" class="tab-content">
+                <div class="auth-card">
+                    <div class="auth-icon">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L3 7V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V7L12 2Z" fill="#FF4C4C"/>
+                        </svg>
+                    </div>
+                    <h2>Admin Paneli</h2>
+                    <form id="admin-login-form">
+                        <input type="text" name="username" placeholder="İstifadəçi adı" required>
+                        <input type="password" name="password" placeholder="Şifrə" required>
+                        <button type="submit" class="btn-primary">Daxil ol</button>
+                        <button type="button" class="btn-secondary" onclick="resetForm()">Çıxış</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Verification Page -->
+    <div id="verification-page" class="page">
+        <div class="verification-content">
+            <div class="auth-card">
+                <h2>Doğrulama</h2>
+                <p class="subtitle">3 sualdan minimum 2-nə doğru cavab verin</p>
+                <form id="verification-form">
+                    <div id="verification-questions"></div>
+                    <button type="submit" class="btn-primary">Doğrula</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Faculty Selection Page -->
+    <div id="faculty-page" class="page">
+        <div class="faculty-header">
+            <h2>BSU Chat</h2>
+            <p>Bakı Dövlət Universiteti</p>
+            <div class="header-actions">
+                <button onclick="showRules()" class="icon-btn">📋</button>
+                <button onclick="showProfile()" class="icon-btn">👤</button>
+                <button onclick="logout()" class="icon-btn">🚪</button>
+            </div>
+        </div>
+        <div class="daily-topic" id="daily-topic"></div>
+        <div class="faculty-grid" id="faculty-grid"></div>
+    </div>
+    
+    <!-- Chat Page -->
+    <div id="chat-page" class="page">
+        <div class="chat-header">
+            <button onclick="backToFacultyList()" class="back-btn">←</button>
+            <h3 id="chat-title"></h3>
+            <div class="header-actions">
+                <button onclick="showRules()" class="icon-btn">📋</button>
+                <button onclick="showProfile()" class="icon-btn">👤</button>
+            </div>
+        </div>
+        <div class="daily-topic" id="chat-daily-topic"></div>
+        <div class="messages-container" id="messages-container"></div>
+        <div class="message-input-container">
+            <input type="text" id="message-input" placeholder="Mesaj yazın...">
+            <button onclick="sendMessage()" class="send-btn">📤</button>
+        </div>
+    </div>
+    
+    <!-- Profile Page -->
+    <div id="profile-page" class="page">
+        <div class="chat-header">
+            <button onclick="closeProfile()" class="back-btn">←</button>
+            <h3>Profil</h3>
+        </div>
+        <div class="profile-content">
+            <div class="profile-picture-container">
+                <img id="profile-picture" src="/default-avatar.png" alt="Profile">
+                <button onclick="uploadProfilePicture()" class="upload-btn">Şəkil Yüklə</button>
+                <input type="file" id="profile-picture-input" accept="image/*" style="display: none;">
+            </div>
+            <form id="profile-form">
+                <input type="text" name="fullName" id="profile-fullname" placeholder="Ad və Soyad" required>
+                <select name="faculty" id="profile-faculty" required>
+                    <option value="">Fakültə seçin</option>
+                    <option value="Mexanika-riyaziyyat fakültəsi">Mexanika-riyaziyyat fakültəsi</option>
+                    <option value="Tətbiqi riyaziyyat və kibernetika fakültəsi">Tətbiqi riyaziyyat və kibernetika fakültəsi</option>
+                    <option value="Fizika fakültəsi">Fizika fakültəsi</option>
+                    <option value="Kimya fakültəsi">Kimya fakültəsi</option>
+                    <option value="Biologiya fakültəsi">Biologiya fakültəsi</option>
+                    <option value="Ekologiya və torpaqşünaslıq fakültəsi">Ekologiya və torpaqşünaslıq fakültəsi</option>
+                    <option value="Coğrafiya fakültəsi">Coğrafiya fakültəsi</option>
+                    <option value="Geologiya fakültəsi">Geologiya fakültəsi</option>
+                    <option value="Filologiya fakültəsi">Filologiya fakültəsi</option>
+                    <option value="Tarix fakültəsi">Tarix fakültəsi</option>
+                    <option value="Beynəlxalq münasibətlər və iqtisadiyyat fakültəsi">Beynəlxalq münasibətlər və iqtisadiyyat fakültəsi</option>
+                    <option value="Hüquq fakültəsi">Hüquq fakültəsi</option>
+                    <option value="Jurnalistika fakültəsi">Jurnalistika fakültəsi</option>
+                    <option value="İnformasiya və sənəd menecmenti fakültəsi">İnformasiya və sənəd menecmenti fakültəsi</option>
+                    <option value="Şərqşünaslıq fakültəsi">Şərqşünaslıq fakültəsi</option>
+                    <option value="Sosial elmlər və psixologiya fakültəsi">Sosial elmlər və psixologiya fakültəsi</option>
+                </select>
+                <select name="degree" id="profile-degree" required>
+                    <option value="">Dərəcə seçin</option>
+                    <option value="Bakalavr">Bakalavr</option>
+                    <option value="Magistr">Magistr</option>
+                    <option value="Doktorantura">Doktorantura</option>
+                </select>
+                <select name="course" id="profile-course" required>
+                    <option value="">Kurs seçin</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                </select>
+                <button type="submit" class="btn-primary">Yenilə</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Rules Modal -->
+    <div id="rules-modal" class="modal">
+        <div class="modal-content">
+            <button onclick="closeRules()" class="close-btn">×</button>
+            <h2>Qaydalar</h2>
+            <div id="rules-content"></div>
+        </div>
+    </div>
+    
+    <!-- User Menu Modal -->
+    <div id="user-menu-modal" class="modal">
+        <div class="modal-content">
+            <button onclick="closeUserMenu()" class="close-btn">×</button>
+            <div class="user-menu-profile">
+                <img id="menu-user-avatar" src="/default-avatar.png" alt="Avatar">
+                <h3 id="menu-user-name"></h3>
+                <p id="menu-user-info"></p>
+            </div>
+            <div class="user-menu-actions">
+                <button onclick="startPrivateChat()" class="menu-btn blue">💬 Şəxsi mesaj</button>
+                <button onclick="blockUser()" class="menu-btn orange">🚫 Əngəllə</button>
+                <button onclick="reportUser()" class="menu-btn red">🚩 Şikayət et</button>
+                <button onclick="closeUserMenu()" class="menu-btn gray">Çıxış</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Admin Panel -->
+    <div id="admin-page" class="page">
+        <div class="admin-header">
+            <h2>Admin Paneli</h2>
+            <button onclick="logoutAdmin()" class="icon-btn">🚪 Çıxış</button>
+        </div>
+        <div class="admin-content">
+            <div class="admin-menu">
+                <button class="admin-menu-btn active" onclick="showAdminSection('statistics')">
+                    <span class="icon">📊</span>
+                    <span>Statistika və İstifadəçilər</span>
+                    <span class="description">Bütün istifadəçilərin siyahısı və statistikaları</span>
+                </button>
+                <button class="admin-menu-btn" onclick="showAdminSection('filter')">
+                    <span class="icon">🔻</span>
+                    <span>Filtr sistemi</span>
+                    <span class="description">Sözləri filtrdən keçirin</span>
+                </button>
+                <button class="admin-menu-btn" onclick="showAdminSection('qaydalar')">
+                    <span class="icon">📋</span>
+                    <span>Qaydalar</span>
+                    <span class="description">Sayt qaydasını göndərin və redaktə edin</span>
+                </button>
+                <button class="admin-menu-btn" onclick="showAdminSection('topic')">
+                    <span class="icon">⭐</span>
+                    <span>Gündəm Müzakirəsi</span>
+                    <span class="description">Gündəm mövzusunu təyin edin</span>
+                </button>
+                <button class="admin-menu-btn" onclick="showAdminSection('reports')">
+                    <span class="icon">👥</span>
+                    <span>Şikayət Edilənlər</span>
+                    <span class="description">Şikayət edilən hesablar</span>
+                </button>
+                <button class="admin-menu-btn" onclick="showAdminSection('subadmins')" id="subadmin-menu" style="display: none;">
+                    <span class="icon">👤</span>
+                    <span>Alt Adminlər</span>
+                    <span class="description">Alt admin yaratma və idarəetmə</span>
+                </button>
+            </div>
+            
+            <div id="admin-statistics" class="admin-section active">
+                <h3>Statistika</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h4>Ümumi İstifadəçi</h4>
+                        <p id="total-users">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Aktiv İstifadəçi</h4>
+                        <p id="active-users">0</p>
+                    </div>
+                </div>
+                <h3>Bütün İstifadəçilər</h3>
+                <div id="users-list" class="users-table"></div>
+            </div>
+            
+            <div id="admin-filter" class="admin-section">
+                <h3>Filtr Sistemi</h3>
+                <textarea id="filter-words" placeholder="Hər sətirdə bir söz daxil edin" rows="10"></textarea>
+                <button onclick="saveFilterWords()" class="btn-primary">Yadda saxla</button>
+            </div>
+            
+            <div id="admin-qaydalar" class="admin-section">
+                <h3>Qaydalar</h3>
+                <textarea id="rules-text" placeholder="Qaydaları buraya yazın" rows="10"></textarea>
+                <button onclick="saveRules()" class="btn-primary">Yadda saxla</button>
+            </div>
+            
+            <div id="admin-topic" class="admin-section">
+                <h3>Gündəm Mövzusu</h3>
+                <input type="text" id="daily-topic-input" placeholder="Günün mövzusunu daxil edin">
+                <button onclick="saveDailyTopic()" class="btn-primary">Yadda saxla</button>
+            </div>
+            
+            <div id="admin-reports" class="admin-section">
+                <h3>Şikayət Edilən Hesablar (16+ şikayət)</h3>
+                <div id="reported-users-list" class="users-table"></div>
+            </div>
+            
+            <div id="admin-subadmins" class="admin-section">
+                <h3>Alt Admin Yarat</h3>
+                <form id="create-subadmin-form">
+                    <input type="text" name="username" placeholder="İstifadəçi adı" required>
+                    <input type="password" name="password" placeholder="Şifrə" required>
+                    <button type="submit" class="btn-primary">Yarat</button>
+                </form>
+                <h3>Alt Adminlər</h3>
+                <div id="subadmins-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>
