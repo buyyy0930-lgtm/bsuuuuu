@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
+.env
+
+# PM2
+.pm2/
+pids/
+logs/
+*.log
+
+# Backup files
+*.backup
+*.bak
+*.tar.gz
+*.zip
+
+# Upload files
+uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
